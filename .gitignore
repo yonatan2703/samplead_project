@@ -1,6 +1,9 @@
 DS_STORE
-/node_modules
+node_modules
+__pycache__
+env
 .flowconfig
+package-lock.json
 *~
 *.pyc
 build/

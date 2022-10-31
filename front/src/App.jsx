@@ -1,34 +1,83 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import './App.css'
+import { useEffect, useState } from "react";
+import { useLocation, useHistory } from "react-router-dom";
+import css from "./app.css";
+import api, { processData } from "./api";
+import Papa from "papaparse";
+import { Spinner } from "@chakra-ui/react";
 
 function App() {
-  const [count, setCount] = useState(0)
+	const location = useLocation();
+	const history = useHistory();
 
-  return (
-    <div className="App">
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </div>
-  )
+	const [token, setToken] = useState(null);
+	const [data, setData] = useState(null);
+	const [header, setHeader] = useState(null);
+	const [loading, setLoading] = useState(false);
+
+	useEffect(() => {
+		if (token) return;
+		let tempToken;
+		tempToken = location?.hash?.split("=")[1]?.split("&")[0];
+		if (tempToken) localStorage.setItem("token", tempToken);
+		else tempToken = localStorage.getItem("token");
+
+		if (tempToken) {
+			setToken(tempToken);
+			history.push("/");
+		}
+	}, []);
+
+	const handleUpload = (e) => {
+		setLoading(true);
+		const file = e.target.files[0];
+		Papa.parse(file, {
+			complete: async function (results) {
+				const csvData = results.data.filter((row) => {
+					return row.length > 1;
+				});
+				try {
+					const { data } = await processData(token, csvData);
+					setHeader(Object.keys(data[0]));
+					setData(data.map((row) => Object.values(row)));
+					setLoading(false);
+				} catch (err) {
+					console.log(err);
+					alert(err);
+					setLoading(false);
+				}
+			},
+		});
+	};
+
+	return (
+		<>
+			<input type="file" onChange={handleUpload} />
+			{loading ? (
+				<Spinner></Spinner>
+			) : (
+				data && (
+					<table>
+						<thead>
+							<tr>
+								{header?.map((h, i) => (
+									<th key={i}>{h}</th>
+								))}
+							</tr>
+						</thead>
+						<tbody>
+							{data?.map((row, i) => (
+								<tr key={i}>
+									{row?.map((cell, i) => (
+										<td key={i}>{cell}</td>
+									))}
+								</tr>
+							))}
+						</tbody>
+					</table>
+				)
+			)}
+		</>
+	);
 }
 
-export default App
+export default App;
