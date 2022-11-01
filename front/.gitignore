@@ -14,5 +14,5 @@ remote-repo/
 .vscode
 test*
 data
-dist
+/dist
 example*

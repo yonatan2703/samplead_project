@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useLocation, useHistory } from "react-router-dom";
-import css from "./app.css";
-import api, { processData } from "./api";
 import Papa from "papaparse";
-import { Spinner } from "@chakra-ui/react";
+import { Spinner, Heading, Box } from "@chakra-ui/react";
+
+import { processData, getTableData, updateTable } from "./api";
+import DataTable from "./components/DataTable";
+import AdminTable from "./components/AdminTable";
 
 function App() {
 	const location = useLocation();
@@ -11,8 +13,13 @@ function App() {
 
 	const [token, setToken] = useState(null);
 	const [data, setData] = useState(null);
-	const [header, setHeader] = useState(null);
+	const [adminData, setAdminData] = useState(null);
 	const [loading, setLoading] = useState(false);
+
+	const inputRef = useRef(null);
+	const header = useMemo(() => {
+		return ["Name", "Description", "nlp_output"];
+	}, []);
 
 	useEffect(() => {
 		if (token) return;
@@ -27,6 +34,26 @@ function App() {
 		}
 	}, []);
 
+	useEffect(() => {
+		if (!token) return;
+		setLoading(true);
+		getTableData(token)
+			.then((res) => {
+				const { prevSession, adminData } = res.data;
+				const data = prevSession?.[0]?.data;
+				if (data) {
+					setData(data);
+				}
+				if (adminData) setAdminData(adminData);
+				setLoading(false);
+			})
+			.catch((err) => {
+				console.log(err);
+				alert(err);
+				setLoading(false);
+			});
+	}, [token]);
+
 	const handleUpload = (e) => {
 		setLoading(true);
 		const file = e.target.files[0];
@@ -36,9 +63,13 @@ function App() {
 					return row.length > 1;
 				});
 				try {
-					const { data } = await processData(token, csvData);
-					setHeader(Object.keys(data[0]));
-					setData(data.map((row) => Object.values(row)));
+					const [[col1, col2], ...dataWoHeader] = csvData;
+					if (col1 !== "Name" || col2 !== "Description") {
+						throw "Wrong column names, first column should be Name and second column should be Description";
+					}
+					const { data } = await processData(token, dataWoHeader);
+					setData(data);
+
 					setLoading(false);
 				} catch (err) {
 					console.log(err);
@@ -47,36 +78,62 @@ function App() {
 				}
 			},
 		});
+		// reset input value
+		inputRef.current.value = "";
+	};
+
+	const updateMyData = (rowIndex, columnId, value) => {
+		setData((prev) => {
+			prev[rowIndex][columnId] = value;
+			return { ...prev };
+		});
+		const data = {
+			index: rowIndex,
+			[columnId]: value,
+		};
+		updateTable(token, data)
+			.then((res) => {
+				console.log(res.data);
+				setLoading(false);
+			})
+			.catch((err) => {
+				console.log(err);
+				alert(err);
+				setLoading(false);
+			});
 	};
 
 	return (
-		<>
-			<input type="file" onChange={handleUpload} />
+		<Box
+			display="flex"
+			flexDir="column"
+			justifyContent="center"
+			alignItems="center"
+		>
+			<Heading m="5"> Upload your CSV file</Heading>
+			<input type="file" onChange={handleUpload} ref={inputRef} />
 			{loading ? (
-				<Spinner></Spinner>
+				<Spinner />
 			) : (
-				data && (
-					<table>
-						<thead>
-							<tr>
-								{header?.map((h, i) => (
-									<th key={i}>{h}</th>
-								))}
-							</tr>
-						</thead>
-						<tbody>
-							{data?.map((row, i) => (
-								<tr key={i}>
-									{row?.map((cell, i) => (
-										<td key={i}>{cell}</td>
-									))}
-								</tr>
-							))}
-						</tbody>
-					</table>
-				)
+				<Box
+					display="flex"
+					flexDir="column"
+					justifyContent="center"
+					alignItems="center"
+				>
+					{data && (
+						<DataTable
+							header={header}
+							data={data}
+							updateMyData={updateMyData}
+						/>
+					)}
+					{adminData && (
+						<AdminTable adminData={adminData} header={header} />
+					)}
+				</Box>
 			)}
-		</>
+		</Box>
 	);
 }
 
