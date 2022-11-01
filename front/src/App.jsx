@@ -1,11 +1,14 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { useLocation, useHistory } from "react-router-dom";
 import Papa from "papaparse";
-import { Spinner, Heading, Box } from "@chakra-ui/react";
+import { Spinner, Heading, Box, Button } from "@chakra-ui/react";
 
 import { processData, getTableData, updateTable } from "./api";
 import DataTable from "./components/DataTable";
 import AdminTable from "./components/AdminTable";
+
+const LOGIN_URL =
+	"https://users-domin.auth.eu-west-1.amazoncognito.com/login?client_id=msuie6bb4ttkrm3k1bt1si5mr&response_type=token&scope=aws.cognito.signin.user.admin+email+openid+phone+profile&redirect_uri=https://splendid-froyo-eb4a6f.netlify.app";
 
 function App() {
 	const location = useLocation();
@@ -15,11 +18,24 @@ function App() {
 	const [data, setData] = useState(null);
 	const [adminData, setAdminData] = useState(null);
 	const [loading, setLoading] = useState(false);
+	const [uploadLoading, setUploadLoading] = useState(false);
 
 	const inputRef = useRef(null);
 	const header = useMemo(() => {
 		return ["Name", "Description", "nlp_output"];
 	}, []);
+
+	const navigateUrl = (url) => {
+		let element = document.createElement("a");
+
+		if (url.startsWith("http://") || url.startsWith("https://")) {
+			element.href = url;
+		} else {
+			element.href = "http://" + url;
+		}
+
+		element.click();
+	};
 
 	useEffect(() => {
 		if (token) return;
@@ -31,6 +47,8 @@ function App() {
 		if (tempToken) {
 			setToken(tempToken);
 			history.push("/");
+		} else {
+			navigateUrl(LOGIN_URL);
 		}
 	}, []);
 
@@ -55,7 +73,7 @@ function App() {
 	}, [token]);
 
 	const handleUpload = (e) => {
-		setLoading(true);
+		setUploadLoading(true);
 		const file = e.target.files[0];
 		Papa.parse(file, {
 			complete: async function (results) {
@@ -70,11 +88,11 @@ function App() {
 					const { data } = await processData(token, dataWoHeader);
 					setData(data);
 
-					setLoading(false);
+					setUploadLoading(false);
 				} catch (err) {
 					console.log(err);
 					alert(err);
-					setLoading(false);
+					setUploadLoading(false);
 				}
 			},
 		});
@@ -111,7 +129,19 @@ function App() {
 			alignItems="center"
 		>
 			<Heading m="5"> Upload your CSV file</Heading>
-			<input type="file" onChange={handleUpload} ref={inputRef} />
+			<Box>
+				<input type="file" onChange={handleUpload} ref={inputRef} />
+				<Button>
+					<a
+						href={LOGIN_URL}
+						onClick={() => {
+							localStorage.removeItem("token");
+						}}
+					>
+						Logout
+					</a>
+				</Button>
+			</Box>
 			{loading ? (
 				<Spinner />
 			) : (
@@ -121,12 +151,16 @@ function App() {
 					justifyContent="center"
 					alignItems="center"
 				>
-					{data && (
-						<DataTable
-							header={header}
-							data={data}
-							updateMyData={updateMyData}
-						/>
+					{uploadLoading ? (
+						<Spinner />
+					) : (
+						data && (
+							<DataTable
+								header={header}
+								data={data}
+								updateMyData={updateMyData}
+							/>
+						)
 					)}
 					{adminData && (
 						<AdminTable adminData={adminData} header={header} />
