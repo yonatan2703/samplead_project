@@ -2,13 +2,17 @@ import react, { useState, useEffect } from "react";
 
 const EditableCell = ({ initialValue, row, column, updateMyData }) => {
 	const [value, setValue] = useState(initialValue);
+	const [prevValue, setPrevValue] = useState(initialValue);
 
 	const onChange = (e) => {
 		setValue(e.target.value);
 	};
 
 	const onBlur = () => {
-		updateMyData(row, column, value);
+		if (prevValue !== value) {
+			updateMyData(row, column, value);
+			setPrevValue(value);
+		}
 	};
 
 	useEffect(() => {
